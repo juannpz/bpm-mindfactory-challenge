@@ -2,6 +2,10 @@
 
 Guía operativa para validación, monitoreo y gestión en producción.
 
+> **Deploy actual:** `https://bpm-challenge.kaijuplatform.com`  
+> **Plataforma:** Coolify v4 (Docker Compose)  
+> **Infra:** PostgreSQL 16, NestJS + Fastify, Next.js 16
+
 ---
 
 ## 1. Cómo validar en producción
@@ -9,26 +13,31 @@ Guía operativa para validación, monitoreo y gestión en producción.
 ### Healthcheck
 
 ```
-GET http://localhost:3001/api/health
+GET https://bpm-challenge.kaijuplatform.com/api/health
 ```
 
-Devuelve `{ status: "ok", timestamp, uptime }`. Debe responder 200 en < 500ms.
+Devuelve `{ status: "ok", timestamp, uptime }`. Debe responder 200.
 
 ### Smoke test manual
 
-1. Login como usuario externo: `POST /api/auth/external/login` con `externo1@test.com / Password123!`
-2. Verificar que devuelve token JWT y datos del usuario.
-3. `GET /api/auth/me` con el token → debe devolver datos del usuario externo.
-4. `GET /api/tramites` con token externo → solo debe devolver trámites donde participa ese usuario.
-5. Login como usuario interno: usar header `X-Mock-User-Id: mock-admin-001`
-6. `GET /api/auth/internal/me` → debe devolver datos del usuario ADMIN.
-7. Verificar que un endpoint protegido sin auth devuelva 401.
+1. Login externo: `POST /api/auth/external/login` con `{ email: "externo1@test.com", password: "Password123!" }` → debe devolver JWT.
+2. `GET /api/auth/me` con el token → debe devolver datos del usuario externo.
+3. `GET /api/tramites` con token externo → solo trámites donde participa ese usuario.
+4. Login interno mock: `POST /api/auth/internal/login` con `{ azureObjectId: "mock-admin-001" }` → debe devolver JWT.
+5. `GET /api/auth/internal/me` con token interno → datos del usuario ADMIN.
+6. Magic link: `POST /api/auth/external/magic-link/request` con `{ email: "externo1@test.com" }` → devuelve `devLink` (sin SMTP configurado).
+7. `POST /api/auth/external/magic-link/verify` con el token del devLink → devuelve JWT.
+8. Endpoint protegido sin auth → 401.
+9. Usuario externo intentando `POST /api/tramites/:id/aprobar` → 403.
+10. Usuario OPERADOR viendo trámites de otra área → no aparecen en listado.
 
 ### Validación de permisos
 
-- Usuario externo intentando `POST /api/tramites/:id/aprobar` → debe devolver 403.
-- Usuario externo intentando ver trámite de otro externo → debe devolver 403.
-- Usuario OPERADOR viendo trámites de otra área → no deben aparecer en listado.
+- Usuario externo → solo ve trámites propios.
+- Usuario OPERADOR/MESA_ENTRADA → solo ve trámites de su área.
+- Usuario ADMIN/AUDITOR → ve todos los trámites.
+- Solo ADMIN/SUPERVISOR puede reasignar.
+- Usuario externo no puede ejecutar acciones de workflow internas.
 
 ---
 
@@ -81,47 +90,50 @@ Devuelve `{ status: "ok", timestamp, uptime }`. Debe responder 200 en < 500ms.
 
 ## 5. Riesgos conocidos
 
-1. **Mock auth en producción**: el modo mock (`MOCK_AUTH=true`) es solo para desarrollo. En producción debe configurarse Azure Entra ID (o Keycloak) para internos y desactivar el header `X-Mock-User-Id`.
+1. **Seed data en cada deploy**: el Dockerfile ejecuta `prisma db seed` en cada inicio del contenedor. En producción con datos reales, modificar el CMD para solo ejecutar `prisma migrate deploy` (sin seed), o usar un flag `SEED_ON_START=false`.
 
-2. **Almacenamiento local de documentos**: los archivos se guardan en `uploads/` dentro del contenedor. Si el contenedor se reinicia, los archivos se pierden. Para producción, migrar a S3 o MinIO con volumen persistente.
+2. **Almacenamiento local de documentos**: los archivos se guardan en el volumen Docker `uploads/`. Si el volumen se elimina, los archivos se pierden. Para producción real, migrar a S3 o MinIO.
 
-3. **Optimistic locking con alta contención**: si dos usuarios intentan tomar el mismo trámite simultáneamente, uno recibirá error de versión. El frontend actual recarga la página, lo cual es aceptable para volúmenes bajos. Para alta concurrencia, implementar reintento automático.
+3. **Optimistic locking con alta contención**: si dos usuarios toman el mismo trámite simultáneamente, uno recibe error de versión. Para alta concurrencia, implementar reintento automático.
 
-4. **Seed data en producción**: el Dockerfile ejecuta `prisma db seed` en cada inicio. Para producción, solo ejecutar migraciones con `prisma migrate deploy` (ya incluido en el CMD del Dockerfile). El seed debe ejecutarse manualmente o solo en entornos de desarrollo.
+4. **JWT sin refresh**: los tokens expiran en 24h sin endpoint de refresh. Para producción, agregar refresh tokens con rotación.
 
-5. **JWT sin refresh**: los tokens JWT expiran en 24h. No hay endpoint de refresh. Para producción, implementar refresh tokens o reducir el tiempo de expiración con rotación.
+5. **Sin rate limiting**: no hay throttling en endpoints. Para producción, agregar `@fastify/rate-limit` o a nivel de reverse proxy (Traefik/Coolify).
 
-6. **Sin rate limiting**: no hay throttling en los endpoints. Para producción, agregar rate limiting con `@nestjs/throttler` o a nivel de ALB/API Gateway.
+6. **Magic link sin email en dev**: sin SMTP configurado, el magic link se muestra en el frontend (campo `devLink` en la respuesta). En producción con SMTP se envía por email real y `devLink` no se retorna.
+
+7. **Claves OIDC mock por instancia**: el `OidcService` genera claves RSA en memoria al iniciar. Con múltiples réplicas del backend, cada una tiene su propio keypair y los tokens de una no son válidos en otra. En producción multi-réplica usar Azure Entra ID o Keycloak.
 
 ---
 
 ## 6. Rollback
 
-### Rollback de aplicación
+### Rollback de aplicación (Coolify)
+
+Desde el dashboard de Coolify, ir al recurso Docker Compose y hacer "Rollback to previous deployment". Coolify mantiene el histórico de deploys y re-ejecuta el compose con la revisión anterior.
+
+### Rollback manual vía Docker
 
 ```bash
-# Volver a una versión anterior de la imagen
+docker compose down
 docker tag bpm-api:previous bpm-api:latest
-docker compose up -d api
+docker compose up -d
 ```
 
 ### Rollback de base de datos
 
 ```bash
-# Las migraciones de Prisma son forward-only estándar.
-# Para rollback manual:
-cd backend
-npx prisma migrate diff --from-schema-datamodel prisma/schema.prisma --to-schema-datasource prisma/schema.prisma --script > rollback.sql
-# Revisar y ejecutar manualmente
+# Backup antes de cualquier migración
+pg_dump $DATABASE_URL > backup_$(date +%Y%m%d_%H%M%S).sql
+
+# Las migraciones de Prisma son forward-only. Para rollback, restaurar snapshot.
+psql $DATABASE_URL < backup.sql
 ```
 
 ### Estrategia recomendada
 
-- Usar migraciones expand-contract: primero agregar columnas/tablas nuevas (sin eliminar las viejas), deployar, y solo después limpiar.
-- Para datos críticos, hacer backup antes de cada migración:
-  ```bash
-  pg_dump $DATABASE_URL > backup_$(date +%Y%m%d_%H%M%S).sql
-  ```
+- Usar migraciones expand-contract: agregar columnas/tablas nuevas sin eliminar las viejas, deployar, y solo después limpiar.
+- Para datos críticos, hacer backup antes de cada deploy.
 
 ---
 
@@ -166,4 +178,4 @@ npx prisma migrate diff --from-schema-datamodel prisma/schema.prisma --to-schema
 
 ---
 
-_Última actualización: 2026-06-16_
+_Última actualización: 2026-06-18_
