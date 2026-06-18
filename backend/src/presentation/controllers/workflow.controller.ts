@@ -25,7 +25,7 @@ import {
   RechazarTramiteDto,
 } from '@application/dtos';
 import { CurrentUser, Roles } from '../decorators';
-import { AuthGuard } from '../guards';
+import { AuthGuard, RolesGuard } from '../guards';
 
 @ApiTags('Workflow')
 @ApiBearerAuth()
@@ -66,6 +66,7 @@ export class WorkflowController {
   }
 
   @Post('asignar')
+  @UseGuards(RolesGuard)
   @Roles('ADMIN', 'SUPERVISOR')
   async asignar(
     @Param('id') id: string,

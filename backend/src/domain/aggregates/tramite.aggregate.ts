@@ -265,7 +265,7 @@ export class Tramite {
       TipoUsuario.INTERNO,
       operadorId,
       this.areaActualId,
-      null,
+      undefined,
       comentario,
     );
   }
@@ -393,7 +393,7 @@ export class Tramite {
       this.prioridad,
       areaNuevaId ?? this.areaActualId,
       this.areaActualNombre,
-      asignadoA ?? this.usuarioAsignadoId,
+      asignadoA !== undefined ? asignadoA : this.usuarioAsignadoId,
       this.usuarioAsignadoNombre,
       this.usuarioExternoId,
       this.usuarioExternoNombre,
