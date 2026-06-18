@@ -129,6 +129,7 @@ function InternoShell({ children }: { children: React.ReactNode }) {
           ml: { md: `${DRAWER_WIDTH}px` },
           width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
           maxWidth: 1200,
+          mx: "auto",
         }}
       >
         {children}

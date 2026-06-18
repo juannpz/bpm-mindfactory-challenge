@@ -14,13 +14,14 @@ import {
   CrearAreaDto,
   ActualizarAreaDto,
 } from '@application/dtos';
+import { AuthGuard } from '../guards/auth.guard';
 import { InternalAuthGuard, RolesGuard } from '../guards';
 import { Roles } from '../decorators';
 import { USUARIO_EXTERNO_REPOSITORY } from '@application/ports/tokens';
 import type { IUsuarioExternoRepository } from '@application/ports/usuario-externo.repository.port';
 
 @Controller()
-@UseGuards(InternalAuthGuard, RolesGuard)
+@UseGuards(AuthGuard)
 export class ConfiguracionController {
   constructor(
     private readonly configUseCases: ConfiguracionUseCases,
@@ -34,12 +35,14 @@ export class ConfiguracionController {
   }
 
   @Post('tipos-tramite')
+  @UseGuards(InternalAuthGuard, RolesGuard)
   @Roles('ADMIN')
   async crearTipoTramite(@Body() dto: CrearTipoTramiteDto) {
     return this.configUseCases.crearTipoTramite(dto);
   }
 
   @Put('tipos-tramite/:id')
+  @UseGuards(InternalAuthGuard, RolesGuard)
   @Roles('ADMIN')
   async actualizarTipoTramite(
     @Param('id') id: string,
@@ -54,12 +57,14 @@ export class ConfiguracionController {
   }
 
   @Post('areas')
+  @UseGuards(InternalAuthGuard, RolesGuard)
   @Roles('ADMIN')
   async crearArea(@Body() dto: CrearAreaDto) {
     return this.configUseCases.crearArea(dto);
   }
 
   @Put('areas/:id')
+  @UseGuards(InternalAuthGuard, RolesGuard)
   @Roles('ADMIN')
   async actualizarArea(
     @Param('id') id: string,
@@ -69,6 +74,7 @@ export class ConfiguracionController {
   }
 
   @Get('usuarios-externos')
+  @UseGuards(InternalAuthGuard)
   async listarUsuariosExternos() {
     const usuarios = await this.usuarioExternoRepo.findAll();
     return usuarios.map((u) => ({
