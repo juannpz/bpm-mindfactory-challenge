@@ -129,7 +129,7 @@ SMTP_HOST=smtp.resend.com
 SMTP_PORT=587
 SMTP_USER=resend
 SMTP_PASS=<api-key>
-SMTP_FROM=bpm@tudominio.com
+SMTP_FROM=bpm@domain.com
 ```
 
 ### Áreas
