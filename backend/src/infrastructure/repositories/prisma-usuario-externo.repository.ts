@@ -7,29 +7,31 @@ import { PrismaService } from '../prisma/prisma.service';
 @Injectable()
 export class PrismaUsuarioExternoRepository implements IUsuarioExternoRepository {
   constructor(private readonly prisma: PrismaService) {}
+
+  private toDomain(d: UsuarioExternoProps): UsuarioExterno {
+    return UsuarioExterno.create(d);
+  }
+
   async findById(id: string) {
     const d = await this.prisma.usuarioExterno.findUnique({ where: { id } });
-    return d
-      ? UsuarioExterno.create(d as unknown as UsuarioExternoProps)
-      : null;
+    return d ? this.toDomain(d as UsuarioExternoProps) : null;
   }
+
   async findByEmail(email: string) {
     const d = await this.prisma.usuarioExterno.findUnique({
       where: { email: email.toLowerCase() },
     });
-    return d
-      ? UsuarioExterno.create(d as unknown as UsuarioExternoProps)
-      : null;
+    return d ? this.toDomain(d as UsuarioExternoProps) : null;
   }
+
   async findAll(): Promise<UsuarioExterno[]> {
     const data = await this.prisma.usuarioExterno.findMany({
       where: { estado: 'ACTIVO' },
       orderBy: { nombre: 'asc' },
     });
-    return data.map((d) =>
-      UsuarioExterno.create(d as unknown as UsuarioExternoProps),
-    );
+    return data.map((d) => this.toDomain(d as UsuarioExternoProps));
   }
+
   async create(u: UsuarioExterno & { passwordHash: string }) {
     const d = await this.prisma.usuarioExterno.create({
       data: {
@@ -43,6 +45,6 @@ export class PrismaUsuarioExternoRepository implements IUsuarioExternoRepository
         fechaAlta: u.fechaAlta,
       },
     });
-    return UsuarioExterno.create(d as unknown as UsuarioExternoProps);
+    return this.toDomain(d as UsuarioExternoProps);
   }
 }

@@ -7,6 +7,11 @@ import { PrismaService } from '../prisma/prisma.service';
 @Injectable()
 export class PrismaMovimientoRepository implements IMovimientoRepository {
   constructor(private readonly prisma: PrismaService) {}
+
+  private toDomain(d: MovimientoTramiteProps): MovimientoTramite {
+    return MovimientoTramite.create(d);
+  }
+
   async create(m: MovimientoTramite): Promise<MovimientoTramite> {
     const d = await this.prisma.movimientoTramite.create({
       data: {
@@ -23,15 +28,14 @@ export class PrismaMovimientoRepository implements IMovimientoRepository {
         fecha: m.fecha,
       },
     });
-    return MovimientoTramite.create(d as unknown as MovimientoTramiteProps);
+    return this.toDomain(d as MovimientoTramiteProps);
   }
+
   async findByTramiteId(tramiteId: string): Promise<MovimientoTramite[]> {
     const data = await this.prisma.movimientoTramite.findMany({
       where: { tramiteId },
       orderBy: { fecha: 'asc' },
     });
-    return data.map((d) =>
-      MovimientoTramite.create(d as unknown as MovimientoTramiteProps),
-    );
+    return data.map((d) => this.toDomain(d as MovimientoTramiteProps));
   }
 }

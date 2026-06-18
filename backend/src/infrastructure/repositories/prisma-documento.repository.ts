@@ -7,6 +7,11 @@ import { PrismaService } from '../prisma/prisma.service';
 @Injectable()
 export class PrismaDocumentoRepository implements IDocumentoRepository {
   constructor(private readonly prisma: PrismaService) {}
+
+  private toDomain(d: DocumentoTramiteProps): DocumentoTramite {
+    return DocumentoTramite.create(d);
+  }
+
   async create(doc: DocumentoTramite): Promise<DocumentoTramite> {
     const d = await this.prisma.documentoTramite.create({
       data: {
@@ -21,24 +26,23 @@ export class PrismaDocumentoRepository implements IDocumentoRepository {
         fechaCarga: doc.fechaCarga,
       },
     });
-    return DocumentoTramite.create(d as unknown as DocumentoTramiteProps);
+    return this.toDomain(d as DocumentoTramiteProps);
   }
+
   async findByTramiteId(tid: string): Promise<DocumentoTramite[]> {
     return (
       await this.prisma.documentoTramite.findMany({
         where: { tramiteId: tid },
         orderBy: { fechaCarga: 'desc' },
       })
-    ).map((d) =>
-      DocumentoTramite.create(d as unknown as DocumentoTramiteProps),
-    );
+    ).map((d) => this.toDomain(d as DocumentoTramiteProps));
   }
+
   async findById(id: string): Promise<DocumentoTramite | null> {
     const d = await this.prisma.documentoTramite.findUnique({ where: { id } });
-    return d
-      ? DocumentoTramite.create(d as unknown as DocumentoTramiteProps)
-      : null;
+    return d ? this.toDomain(d as DocumentoTramiteProps) : null;
   }
+
   async delete(id: string): Promise<void> {
     await this.prisma.documentoTramite.delete({ where: { id } });
   }

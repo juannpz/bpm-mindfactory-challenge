@@ -111,7 +111,7 @@ export default function ExternoLoginPage() {
         <Typography variant="body2" color="text.secondary" gutterBottom>
           ¿Sin contraseña?
         </Typography>
-        <Button variant="text" onClick={() => router.push("/externo/magic-link")}>
+        <Button variant="text" onClick={() => router.push("/magic-link")}>
           Ingresar con enlace mágico
         </Button>
       </Box>

@@ -463,6 +463,7 @@ Debe devolver:
 Se espera:
 
 1- Prisma ORM.
+
 - PostgreSQL.
 - Migraciones Prisma.
 - Transacciones en cambios de workflow.
@@ -712,44 +713,44 @@ Cada PR debe incluir:
 
 ## Checklist de aceptación
 
-- [ ]  docker compose up -d –build levanta db, api y web.
-- [ ]  Portal interno disponible.
-- [ ]  Portal externo disponible.
-- [ ]  Login externo funcional.
-- [ ]  Auth interna implementada o mock documentado.
-- [ ]  Usuarios internos y externos tienen permisos separados.
-- [ ]  Se puede crear trámite externo → interno.
-- [ ]  Se puede crear trámite interno → interno.
-- [ ]  Se puede crear trámite interno → externo.
-- [ ]  Se puede tomar, derivar, observar, responder, aprobar, rechazar y cerrar.
-- [ ]  Todo cambio genera movimiento de auditoría.
-- [ ]  Timeline visible en frontend.
-- [ ]  Comentarios internos no son visibles para externos.
-- [ ]  Externo no puede ver trámites ajenos.
-- [ ]  401, 403, 404, 422 correctamente manejados.
-- [ ]  Tests backend pasan.
-- [ ]  Tests frontend pasan.
-- [ ]  Prisma migrations disponibles.
-- [ ]  Seeds disponibles.
-- [ ]  README completo.
-- [ ]  Decision log completo.
-- [ ]  Production notes completo.
-- [ ]  AWS deployment doc completo.
+- [ ] docker compose up -d –build levanta db, api y web.
+- [ ] Portal interno disponible.
+- [ ] Portal externo disponible.
+- [ ] Login externo funcional.
+- [ ] Auth interna implementada o mock documentado.
+- [ ] Usuarios internos y externos tienen permisos separados.
+- [ ] Se puede crear trámite externo → interno.
+- [ ] Se puede crear trámite interno → interno.
+- [ ] Se puede crear trámite interno → externo.
+- [ ] Se puede tomar, derivar, observar, responder, aprobar, rechazar y cerrar.
+- [ ] Todo cambio genera movimiento de auditoría.
+- [ ] Timeline visible en frontend.
+- [ ] Comentarios internos no son visibles para externos.
+- [ ] Externo no puede ver trámites ajenos.
+- [ ] 401, 403, 404, 422 correctamente manejados.
+- [ ] Tests backend pasan.
+- [ ] Tests frontend pasan.
+- [ ] Prisma migrations disponibles.
+- [ ] Seeds disponibles.
+- [ ] README completo.
+- [ ] Decision log completo.
+- [ ] Production notes completo.
+- [ ] AWS deployment doc completo.
 
 ## Criterios de evaluación
 
-| Criterio | Puntos |
-| --- | --- |
-| Modelado BPM, workflow y reglas de negocio | 15 |
-| Auth interna/externa y autorización | 15 |
-| Clean Architecture / DDD backend | 15 |
-| Prisma, PostgreSQL, migraciones, transacciones y concurrencia | 10 |
-| Frontend Next.js, React, Material UI y UX operacional | 15 |
-| Formularios, validaciones y manejo de errores | 8 |
-| Testing unitario e integración | 10 |
-| Docker, tooling y DX | 5 |
-| Git workflow profesional | 4 |
-| Documentación técnica y producción | 3 |
+| Criterio                                                      | Puntos |
+| ------------------------------------------------------------- | ------ |
+| Modelado BPM, workflow y reglas de negocio                    | 15     |
+| Auth interna/externa y autorización                           | 15     |
+| Clean Architecture / DDD backend                              | 15     |
+| Prisma, PostgreSQL, migraciones, transacciones y concurrencia | 10     |
+| Frontend Next.js, React, Material UI y UX operacional         | 15     |
+| Formularios, validaciones y manejo de errores                 | 8      |
+| Testing unitario e integración                                | 10     |
+| Docker, tooling y DX                                          | 5      |
+| Git workflow profesional                                      | 4      |
+| Documentación técnica y producción                            | 3      |
 
 Total: 100 pts.
 
@@ -772,7 +773,7 @@ Hasta 10 puntos extra:
 ## Entrega
 
 A partir de la recepcion del mismo, posee 7 dias corridos para la entrega.
-Enviar mail a: **challenge@mindfactory.ar** 
+Enviar mail a: **challenge@mindfactory.ar**
 
 Con:
 

@@ -7,6 +7,11 @@ import { PrismaService } from '../prisma/prisma.service';
 @Injectable()
 export class PrismaComentarioRepository implements IComentarioRepository {
   constructor(private readonly prisma: PrismaService) {}
+
+  private toDomain(d: ComentarioTramiteProps): ComentarioTramite {
+    return ComentarioTramite.create(d);
+  }
+
   async create(c: ComentarioTramite): Promise<ComentarioTramite> {
     const d = await this.prisma.comentarioTramite.create({
       data: {
@@ -19,7 +24,7 @@ export class PrismaComentarioRepository implements IComentarioRepository {
         fecha: c.fecha,
       },
     });
-    return ComentarioTramite.create(d as unknown as ComentarioTramiteProps);
+    return this.toDomain(d as ComentarioTramiteProps);
   }
 
   async findByTramiteId(tid: string): Promise<ComentarioTramite[]> {
@@ -35,10 +40,7 @@ export class PrismaComentarioRepository implements IComentarioRepository {
       .filter((c) => c.autorTipo === 'EXTERNO' && c.autorId)
       .map((c) => c.autorId!);
 
-    const [internos, externos]: [
-      { id: string; nombre: string }[],
-      { id: string; nombre: string }[],
-    ] = await Promise.all([
+    const [internos, externos] = await Promise.all([
       internosIds.length > 0
         ? this.prisma.usuarioInterno.findMany({
             where: { id: { in: internosIds } },
@@ -58,10 +60,16 @@ export class PrismaComentarioRepository implements IComentarioRepository {
     externos.forEach((u) => nombreMap.set(u.id, u.nombre));
 
     return comentarios.map((c) =>
-      ComentarioTramite.create({
-        ...c,
+      this.toDomain({
+        id: c.id,
+        tramiteId: c.tramiteId,
+        mensaje: c.mensaje,
+        visibilidad: c.visibilidad,
+        autorTipo: c.autorTipo,
+        autorId: c.autorId,
         autorNombre: (c.autorId && nombreMap.get(c.autorId)) || null,
-      } as unknown as ComentarioTramiteProps),
+        fecha: c.fecha,
+      } as ComentarioTramiteProps),
     );
   }
 }
