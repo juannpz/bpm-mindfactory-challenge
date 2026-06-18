@@ -260,4 +260,46 @@ presentation/    → controllers, guards, pipes, exception filters
 
 ---
 
-_Última actualización: 2026-06-17_
+## 12. Azure Entra ID real
+
+### 12.1. Validación de tokens Azure vía JWKS
+
+**Decisión**: implementar la validación de tokens de Azure Entra ID usando `jwks-rsa` + `jsonwebtoken` en lugar de depender exclusivamente del middleware `passport-azure-ad`.
+
+**Por qué**: `passport-azure-ad` requiere que el token esté en el header `Authorization: Bearer` y utiliza Passport como middleware. El `AuthGuard` unificado ya maneja tokens de ambos tipos (interno y externo); agregar un segundo guard Passport para Azure hubiera requerido modificar la cadena de guards en todos los controllers. Implementar la validación JWKS dentro del `AzureInternalTokenValidator` (en el mismo patrón que `MockInternalTokenValidator`) permite que el guard existente maneje Azure de forma transparente, reutilizando la misma lógica de lookup de usuario por `azureObjectId`.
+
+**Trade-off**: no se aprovecha el caching de JWKS que `passport-azure-ad` ofrece a través de `jwks-rsa` internamente. Para compensarlo, configuramos `jwks-rsa` con `cache: true`, `cacheMaxAge: 600000` (10 min) y `rateLimit: true`.
+
+### 12.2. Mapeo de identidad Azure → usuario interno
+
+**Decisión**: el claim `oid` (Object ID) del token Azure se usa para buscar al usuario interno por `UsuarioInterno.azureObjectId`.
+
+**Por qué**: es el identificador inmutable en Azure Entra ID. No cambia si el usuario cambia de nombre o email.
+
+---
+
+## 13. Magic Link
+
+### 13.1. Tokens single-use con TTL
+
+**Decisión**: `MagicTokenService` genera tokens de 32 bytes aleatorios con timestamp, almacenados en un `Map` en memoria con TTL de 15 minutos. Cada token se consume una sola vez y se elimina tras su uso.
+
+**Por qué**: implementación simple y segura para el alcance del challenge. En producción con múltiples réplicas, se reemplazaría por una tabla en base de datos o Redis.
+
+**Trade-off**: los tokens no sobreviven a un reinicio del servidor. Para el volumen esperado (trámites administrativos, baja frecuencia de login), esto es aceptable.
+
+### 13.2. Email simulado en desarrollo
+
+**Decisión**: en ausencia de configuración SMTP, el endpoint `POST /auth/external/magic-link/request` devuelve el magic link en la respuesta JSON (campo `devLink`), y el frontend lo muestra en pantalla para testing.
+
+**Por qué**: permite probar el flujo completo sin depender de un servicio de email externo. En producción, con SMTP configurado (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`), el enlace se envía por email real vía `nodemailer` y el campo `devLink` no se retorna.
+
+### 13.3. Respuesta genérica en solicitud de magic link
+
+**Decisión**: el endpoint siempre retorna el mismo mensaje — "Si el email está registrado, recibirás un enlace de acceso" — independientemente de si el email existe o no.
+
+**Por qué**: previene enumeración de usuarios (user enumeration attack). Un atacante no puede determinar qué emails están registrados en el sistema.
+
+---
+
+_Última actualización: 2026-06-18_

@@ -10,29 +10,20 @@ import { Inject } from '@nestjs/common';
 import { IS_PUBLIC_KEY } from '../decorators';
 import { USUARIO_INTERNO_REPOSITORY } from '@application/ports/tokens';
 import type { IUsuarioInternoRepository } from '@application/ports/usuario-interno.repository.port';
-import { MockInternalTokenValidator } from '@infrastructure/auth/internal-token-validators';
+import {
+  MockInternalTokenValidator,
+  AzureInternalTokenValidator,
+} from '@infrastructure/auth/internal-token-validators';
 
 const isMockMode = () => process.env.MOCK_AUTH !== 'false';
 
-/**
- * AuthGuard unificado — provider-agnostic.
- *
- * Internos:
- *   MOCK_AUTH=true  → token RS256 firmado por OIDC mock local
- *   MOCK_AUTH=false → token Azure Entra ID (passport-azure-ad BearerStrategy)
- *
- * Externos:
- *   Siempre JWT HS256 con JWT_SECRET_EXTERNAL
- *
- * Fallback:
- *   X-Mock-User-Id (solo en modo mock)
- */
 @Injectable()
 export class AuthGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly jwtService: JwtService,
     private readonly mockValidator: MockInternalTokenValidator,
+    private readonly azureValidator: AzureInternalTokenValidator,
     @Inject(USUARIO_INTERNO_REPOSITORY)
     private readonly usuarioInternoRepo: IUsuarioInternoRepository,
   ) {}
@@ -50,8 +41,8 @@ export class AuthGuard implements CanActivate {
     if (authHeader?.startsWith('Bearer ')) {
       const token = authHeader.slice(7);
 
-      // 1. Internal token — modo mock: RS256 local / prod: Azure AD
       if (isMockMode()) {
+        // Mock: validate RS256 token from local OIDC
         const payload = this.mockValidator.verify(token);
         if (payload) {
           const usuario = await this.usuarioInternoRepo.findById(payload.sub);
@@ -66,11 +57,27 @@ export class AuthGuard implements CanActivate {
             return true;
           }
         }
+      } else {
+        // Production: validate Azure Entra ID token
+        const azurePayload = await this.azureValidator.verify(token);
+        if (azurePayload) {
+          const usuario = await this.usuarioInternoRepo.findByAzureObjectId(
+            azurePayload.azureObjectId,
+          );
+          if (usuario && usuario.activo) {
+            request.user = {
+              id: usuario.id,
+              tipo: 'INTERNO',
+              email: usuario.email,
+              rol: usuario.rol,
+              areaId: usuario.areaId,
+            };
+            return true;
+          }
+        }
       }
-      // Production mode: Azure AD validation is handled by AzureAdGuard
-      // (applied via @UseGuards on controllers or globally via APP_GUARD)
 
-      // 2. External JWT (HS256)
+      // External JWT (HS256) — try for both mock and production
       try {
         const payload = this.jwtService.verify(token);
         request.user = {
@@ -84,7 +91,7 @@ export class AuthGuard implements CanActivate {
       }
     }
 
-    // 3. Fallback: X-Mock-User-Id (solo modo mock)
+    // Fallback: X-Mock-User-Id (solo modo mock)
     if (isMockMode()) {
       const mockUserId: string | undefined = request.headers['x-mock-user-id'];
       if (mockUserId) {

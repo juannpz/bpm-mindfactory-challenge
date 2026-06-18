@@ -25,6 +25,8 @@ import {
 } from './auth/internal-token-validators';
 import { AzureAdStrategy } from './auth/strategies/azure-ad.strategy';
 import { PrismaUnitOfWork } from './prisma/prisma-unit-of-work';
+import { MagicTokenService } from './auth/magic-token.service';
+import { EmailService } from './auth/email.service';
 import {
   TRAMITE_REPOSITORY,
   MOVIMIENTO_REPOSITORY,
@@ -69,6 +71,8 @@ const authProviders = [
   OidcService,
   MockInternalTokenValidator,
   AzureInternalTokenValidator,
+  MagicTokenService,
+  EmailService,
   ...(process.env.MOCK_AUTH !== 'false' ? [] : [AzureAdStrategy]),
 ];
 

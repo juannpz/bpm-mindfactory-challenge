@@ -4,13 +4,13 @@ Plataforma BPM para gestionar trámites entre áreas internas y usuarios externo
 
 ## Stack Tecnológico
 
-| Capa     | Tecnología                                                  |
-| -------- | ----------------------------------------------------------- |
-| Frontend | React 19, Next.js 15+, TypeScript, Material UI, Formik, Yup |
-| Backend  | Node.js 24, NestJS 11, Fastify, Prisma 7, PostgreSQL        |
-| Auth     | Mock Azure (header `X-Mock-User-Id`) + JWT externo (bcrypt) |
-| Tooling  | ESLint, Prettier, Husky, lint-staged, commitlint            |
-| Infra    | Docker Compose, AWS documentado                             |
+| Capa     | Tecnología                                                          |
+| -------- | ------------------------------------------------------------------- |
+| Frontend | React 19, Next.js 15+, TypeScript, Material UI, Formik, Yup         |
+| Backend  | Node.js 24, NestJS 11, Fastify, Prisma 7, PostgreSQL                |
+| Auth     | Azure Entra ID / Mock OIDC (internos) + JWT + Magic Link (externos) |
+| Tooling  | ESLint, Prettier, Husky, lint-staged, commitlint                    |
+| Infra    | Docker Compose, AWS documentado                                     |
 
 ## Requisitos previos
 
@@ -83,6 +83,43 @@ cd frontend && npm test
 | María García | `externo2@test.com` | `Password123!` | ACTIVO                 |
 | Carlos López | `externo3@test.com` | `Password123!` | PENDIENTE_VERIFICACION |
 
+### Autenticación Azure Entra ID (producción)
+
+Para usar autenticación real con Azure Entra ID en lugar del mock:
+
+```env
+# Backend .env
+MOCK_AUTH=false
+AZURE_TENANT_ID=<tenant-id>
+AZURE_CLIENT_ID=<client-id>
+
+# Frontend
+NEXT_PUBLIC_MOCK_AUTH=false
+NEXT_PUBLIC_AZURE_CLIENT_ID=<client-id>
+NEXT_PUBLIC_AZURE_TENANT_ID=<tenant-id>
+```
+
+La validación de tokens se hace contra los JWKS de Azure (`login.microsoftonline.com/{tenantId}/discovery/v2.0/keys`), verificando firma RS256/RS384, issuer, audience y expiración. El claim `oid` se mapea a `UsuarioInterno.azureObjectId`.
+
+### Magic Link (externos)
+
+Los usuarios externos pueden iniciar sesión sin contraseña mediante magic link:
+
+- `POST /api/auth/external/magic-link/request` — Solicitar enlace (recibe `{ email }`)
+- `POST /api/auth/external/magic-link/verify` — Verificar token e iniciar sesión
+
+**Modo desarrollo (sin SMTP):** el enlace mágico se devuelve en la respuesta del endpoint y se muestra en el frontend para testing.
+
+**Modo producción con email real:** configurar SMTP en `.env`:
+
+```env
+SMTP_HOST=smtp.resend.com
+SMTP_PORT=587
+SMTP_USER=resend
+SMTP_PASS=<api-key>
+SMTP_FROM=bpm@tudominio.com
+```
+
 ### Áreas
 
 | Nombre          | Código |
@@ -105,8 +142,12 @@ cd frontend && npm test
 ### Auth
 
 - `POST /api/auth/external/register` — Registro de usuario externo
-- `POST /api/auth/external/login` — Login de usuario externo (devuelve JWT)
+- `POST /api/auth/external/login` — Login con email + contraseña (devuelve JWT)
+- `POST /api/auth/external/magic-link/request` — Solicitar magic link sin contraseña
+- `POST /api/auth/external/magic-link/verify` — Verificar token de magic link (devuelve JWT)
+- `POST /api/auth/internal/login` — Login interno (mock OIDC o Azure Entra ID)
 - `GET /api/auth/me` — Datos del usuario autenticado
+- `GET /api/auth/internal/me` — Datos del usuario interno
 
 ### Trámites
 
@@ -139,7 +180,8 @@ cd frontend && npm test
 
 ## Supuestos funcionales
 
-- La autenticación interna usa modo mock con header `X-Mock-User-Id`. En producción debe configurarse Azure Entra ID.
+- La autenticación interna funciona en dos modos: mock local (OIDC con RS256, default) y Azure Entra ID (producción, configurable con `MOCK_AUTH=false`).
+- El magic link para externos es funcional: en modo dev muestra el link en pantalla; con SMTP configurado envía email real.
 - El almacenamiento de documentos es local (`uploads/`). Para producción se recomienda S3 o MinIO.
 - Las contraseñas de usuarios externos se hashean con bcrypt (10 rounds).
 - El optimistic locking usa un campo `version` en la tabla Tramite.

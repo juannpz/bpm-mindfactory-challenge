@@ -14,5 +14,5 @@
     "../../generated/prisma/client.js": "<rootDir>/src/application/__tests__/__mocks__/prisma-client.mock.ts",
     "@prisma/adapter-pg": "<rootDir>/src/application/__tests__/__mocks__/prisma-adapter-pg.mock.ts"
   },
-  "transformIgnorePatterns": ["/node_modules/(?!(uuid)/)"]
+  "transformIgnorePatterns": ["/node_modules/(?!(uuid|jose|jwks-rsa)/)"]
 }
