@@ -1,0 +1,79 @@
+services:
+  db:
+    image: postgres:16-alpine
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-bpm}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-bpm}
+      - POSTGRES_DB=${POSTGRES_DB:-bpm_db}
+    ports:
+      - "${DB_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bpm} -d ${POSTGRES_DB:-bpm_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "${API_PORT:-3001}:${API_PORT:-3001}"
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-bpm}:${POSTGRES_PASSWORD:-bpm}@db:5432/${POSTGRES_DB:-bpm_db}
+      - JWT_SECRET_EXTERNAL=${JWT_SECRET_EXTERNAL:-super-secret-external-jwt-key}
+      - JWT_SECRET_INTERNAL=${JWT_SECRET_INTERNAL:-super-secret-internal-jwt-key}
+      - API_PORT=${API_PORT:-3001}
+      - MOCK_AUTH=${MOCK_AUTH:-true}
+      - AZURE_TENANT_ID=${AZURE_TENANT_ID:-}
+      - AZURE_CLIENT_ID=${AZURE_CLIENT_ID:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - uploads:/app/uploads
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://localhost:${API_PORT:-3001}/api/health', function(r) {process.exit(r.statusCode === 200 ? 0 : 1)})",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:3001/api}
+        - NEXT_PUBLIC_MOCK_AUTH=${NEXT_PUBLIC_MOCK_AUTH:-true}
+        - NEXT_PUBLIC_AZURE_CLIENT_ID=${NEXT_PUBLIC_AZURE_CLIENT_ID:-}
+        - NEXT_PUBLIC_AZURE_TENANT_ID=${NEXT_PUBLIC_AZURE_TENANT_ID:-}
+        - API_INTERNAL_URL=http://api:3001
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:3001/api}
+      - NEXT_PUBLIC_MOCK_AUTH=${NEXT_PUBLIC_MOCK_AUTH:-true}
+      - NEXT_PUBLIC_AZURE_CLIENT_ID=${NEXT_PUBLIC_AZURE_CLIENT_ID:-}
+      - NEXT_PUBLIC_AZURE_TENANT_ID=${NEXT_PUBLIC_AZURE_TENANT_ID:-}
+      - API_INTERNAL_URL=http://api:3001
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  uploads:
