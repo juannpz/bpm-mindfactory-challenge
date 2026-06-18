@@ -1,0 +1,5 @@
+export enum EstadoUsuarioExterno {
+  PENDIENTE_VERIFICACION = 'PENDIENTE_VERIFICACION',
+  ACTIVO = 'ACTIVO',
+  BLOQUEADO = 'BLOQUEADO',
+}

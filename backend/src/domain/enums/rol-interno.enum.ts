@@ -1,0 +1,7 @@
+export enum RolInterno {
+  ADMIN = 'ADMIN',
+  MESA_ENTRADA = 'MESA_ENTRADA',
+  OPERADOR = 'OPERADOR',
+  SUPERVISOR = 'SUPERVISOR',
+  AUDITOR = 'AUDITOR',
+}
