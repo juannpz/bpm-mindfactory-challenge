@@ -8,6 +8,14 @@ import {
   UseGuards,
   Inject,
 } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiBody,
+  ApiParam,
+} from '@nestjs/swagger';
 import { ConfiguracionUseCases } from '@application/use-cases';
 import {
   CrearTipoTramiteDto,
@@ -20,6 +28,8 @@ import { Roles } from '../decorators';
 import { USUARIO_EXTERNO_REPOSITORY } from '@application/ports/tokens';
 import type { IUsuarioExternoRepository } from '@application/ports/usuario-externo.repository.port';
 
+@ApiTags('Configuración')
+@ApiBearerAuth()
 @Controller()
 @UseGuards(AuthGuard)
 export class ConfiguracionController {
@@ -30,6 +40,9 @@ export class ConfiguracionController {
   ) {}
 
   @Get('tipos-tramite')
+  @ApiOperation({ summary: 'Listar todos los tipos de trámite' })
+  @ApiResponse({ status: 200, description: 'Lista de tipos de trámite' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
   async listarTiposTramite() {
     return this.configUseCases.listarTiposTramite();
   }
@@ -37,6 +50,12 @@ export class ConfiguracionController {
   @Post('tipos-tramite')
   @UseGuards(InternalAuthGuard, RolesGuard)
   @Roles('ADMIN')
+  @ApiOperation({ summary: 'Crear un nuevo tipo de trámite (ADMIN)' })
+  @ApiBody({ type: CrearTipoTramiteDto })
+  @ApiResponse({ status: 201, description: 'Tipo de trámite creado' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
+  @ApiResponse({ status: 403, description: 'Solo ADMIN' })
+  @ApiResponse({ status: 422, description: 'Datos inválidos' })
   async crearTipoTramite(@Body() dto: CrearTipoTramiteDto) {
     return this.configUseCases.crearTipoTramite(dto);
   }
@@ -44,6 +63,17 @@ export class ConfiguracionController {
   @Put('tipos-tramite/:id')
   @UseGuards(InternalAuthGuard, RolesGuard)
   @Roles('ADMIN')
+  @ApiOperation({ summary: 'Actualizar un tipo de trámite (ADMIN)' })
+  @ApiParam({
+    name: 'id',
+    description: 'ID del tipo de trámite',
+    example: 'uuid-tipo',
+  })
+  @ApiBody({ type: CrearTipoTramiteDto })
+  @ApiResponse({ status: 200, description: 'Tipo de trámite actualizado' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
+  @ApiResponse({ status: 403, description: 'Solo ADMIN' })
+  @ApiResponse({ status: 404, description: 'Tipo de trámite no encontrado' })
   async actualizarTipoTramite(
     @Param('id') id: string,
     @Body() dto: Partial<CrearTipoTramiteDto>,
@@ -52,6 +82,9 @@ export class ConfiguracionController {
   }
 
   @Get('areas')
+  @ApiOperation({ summary: 'Listar todas las áreas' })
+  @ApiResponse({ status: 200, description: 'Lista de áreas' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
   async listarAreas() {
     return this.configUseCases.listarAreas();
   }
@@ -59,6 +92,12 @@ export class ConfiguracionController {
   @Post('areas')
   @UseGuards(InternalAuthGuard, RolesGuard)
   @Roles('ADMIN')
+  @ApiOperation({ summary: 'Crear una nueva área (ADMIN)' })
+  @ApiBody({ type: CrearAreaDto })
+  @ApiResponse({ status: 201, description: 'Área creada' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
+  @ApiResponse({ status: 403, description: 'Solo ADMIN' })
+  @ApiResponse({ status: 422, description: 'Datos inválidos' })
   async crearArea(@Body() dto: CrearAreaDto) {
     return this.configUseCases.crearArea(dto);
   }
@@ -66,6 +105,13 @@ export class ConfiguracionController {
   @Put('areas/:id')
   @UseGuards(InternalAuthGuard, RolesGuard)
   @Roles('ADMIN')
+  @ApiOperation({ summary: 'Actualizar un área (ADMIN)' })
+  @ApiParam({ name: 'id', description: 'ID del área', example: 'uuid-area' })
+  @ApiBody({ type: ActualizarAreaDto })
+  @ApiResponse({ status: 200, description: 'Área actualizada' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
+  @ApiResponse({ status: 403, description: 'Solo ADMIN' })
+  @ApiResponse({ status: 404, description: 'Área no encontrada' })
   async actualizarArea(
     @Param('id') id: string,
     @Body() dto: ActualizarAreaDto,
@@ -75,6 +121,10 @@ export class ConfiguracionController {
 
   @Get('usuarios-externos')
   @UseGuards(InternalAuthGuard)
+  @ApiOperation({ summary: 'Listar usuarios externos (INTERNO)' })
+  @ApiResponse({ status: 200, description: 'Lista de usuarios externos' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
+  @ApiResponse({ status: 403, description: 'Solo usuarios internos' })
   async listarUsuariosExternos() {
     const usuarios = await this.usuarioExternoRepo.findAll();
     return usuarios.map((u) => ({
