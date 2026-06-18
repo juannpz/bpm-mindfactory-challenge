@@ -15,7 +15,6 @@ import {
 } from "@mui/material";
 import { useFormik } from "formik";
 import * as yup from "yup";
-import { useAuth } from "@/contexts/auth.context";
 import { useSnackbar } from "notistack";
 import api from "@/services/api";
 
@@ -152,8 +151,6 @@ function MagicLinkRequestForm() {
 }
 
 function MagicLinkVerify({ token }: { token: string }) {
-  const router = useRouter();
-  const { login } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
   const [error, setError] = useState<string | null>(null);
 
@@ -179,7 +176,7 @@ function MagicLinkVerify({ token }: { token: string }) {
         document.cookie = `bpm_token=${data.token}; path=/; SameSite=Lax; max-age=${30 * 24 * 60 * 60}`;
 
         enqueueSnackbar("Inicio de sesión exitoso", { variant: "success" });
-        router.push("/externo/mis-tramites");
+        window.location.href = "/externo/mis-tramites";
       } catch {
         if (!cancelled) {
           setError("El enlace es inválido o ha expirado. Solicitá uno nuevo.");
@@ -191,7 +188,7 @@ function MagicLinkVerify({ token }: { token: string }) {
     return () => {
       cancelled = true;
     };
-  }, [token, router, login, enqueueSnackbar]);
+  }, [token, enqueueSnackbar]);
 
   if (error) {
     return (
@@ -199,7 +196,12 @@ function MagicLinkVerify({ token }: { token: string }) {
         <Alert severity="error" sx={{ mb: 3 }}>
           {error}
         </Alert>
-        <Button variant="contained" onClick={() => router.push("/magic-link")}>
+        <Button
+          variant="contained"
+          onClick={() => {
+            window.location.href = "/magic-link";
+          }}
+        >
           Solicitar nuevo enlace
         </Button>
       </Box>
