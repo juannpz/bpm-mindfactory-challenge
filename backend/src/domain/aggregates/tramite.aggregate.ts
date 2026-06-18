@@ -243,7 +243,7 @@ export class Tramite {
       TipoUsuario.EXTERNO,
       usuarioExternoId,
       this.areaActualId,
-      usuarioExternoId,
+      null,
       comentario,
     );
   }
@@ -265,7 +265,7 @@ export class Tramite {
       TipoUsuario.INTERNO,
       operadorId,
       this.areaActualId,
-      usuarioExternoId,
+      null,
       comentario,
     );
   }
@@ -281,7 +281,7 @@ export class Tramite {
       TipoUsuario.EXTERNO,
       usuarioExternoId,
       this.areaActualId,
-      usuarioExternoId,
+      null,
       comentario,
     );
   }

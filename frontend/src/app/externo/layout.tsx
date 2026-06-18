@@ -39,7 +39,7 @@ function ExternoShell({ children }: { children: React.ReactNode }) {
           </Button>
         </Toolbar>
       </AppBar>
-      <Box component="main" sx={{ flexGrow: 1, p: 3, maxWidth: 1200 }}>
+      <Box component="main" sx={{ flexGrow: 1, p: 3, maxWidth: 1200, mx: "auto", width: "100%" }}>
         {children}
       </Box>
     </Box>
