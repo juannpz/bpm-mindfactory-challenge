@@ -1,0 +1,9 @@
+export { AuthController } from './auth.controller';
+export { TramiteController } from './tramite.controller';
+export { WorkflowController } from './workflow.controller';
+export { DocumentoController } from './documento.controller';
+export { ComentarioController } from './comentario.controller';
+export { ConfiguracionController } from './configuracion.controller';
+export { DashboardController } from './dashboard.controller';
+export { HealthController } from './health.controller';
+export { OidcController } from './oidc.controller';
