@@ -14,15 +14,16 @@ Propuesta de despliegue en AWS para entorno productivo.
                           │                       │                  │
                           │           ┌───────────┴───────────┐      │
                           │           ▼                       ▼      │
-                          │     ECS Fargate (api)     S3 (frontend)  │
-                          │           │                              │
-                          │           ▼                              │
-                          │     RDS PostgreSQL                        │
-                          │           │                              │
-                          │           ▼                              │
-                          │     Secrets Manager                       │
-                          │           │                              │
-                          │           ▼                              │
+                          │     ECS Fargate (api)    ECS Fargate (web)│
+                          │     puerto 3001          puerto 3000      │
+                          │           │                  │            │
+                          │           ▼                  │            │
+                          │     RDS PostgreSQL           │            │
+                          │           │                  │            │
+                          │           ▼                  │            │
+                          │     Secrets Manager          │            │
+                          │           │                  │            │
+                          │           ▼                  ▼            │
                           │     CloudWatch Logs                       │
                           └──────────────────────────────────────────┘
 ```
@@ -35,22 +36,44 @@ Propuesta de despliegue en AWS para entorno productivo.
 
 - **Servicio**: `bpm-api`
 - **Task definition**: 1 vCPU, 2 GB RAM
-- **Imagen**: construida desde el `Dockerfile` del backend, publicada en ECR
-- **Auto-scaling**: min 1, max 3 tareas. Escalar por CPU > 70% o solicitudes por tarea > 500.
+- **Imagen**: construida desde `backend/Dockerfile` (multi-stage, Node.js 24 Alpine), publicada en ECR
+- **Puerto**: 3001
+- **Auto-scaling**: min 1, max 3 tareas. Escalar por CPU > 70%.
 - **Variables de entorno** (vía Secrets Manager):
   - `DATABASE_URL`: connection string de RDS
-  - `JWT_SECRET`: secreto para firma de tokens JWT
-  - `MOCK_AUTH=false`: autenticación real (Azure Entra ID)
+  - `JWT_SECRET_EXTERNAL`: firma de tokens JWT para usuarios externos (HS256)
+  - `JWT_SECRET_INTERNAL`: firma de tokens JWT para usuarios internos (RS256 mock o Azure)
+  - `MOCK_AUTH=false`: desactiva mock OIDC y activa Azure Entra ID
+  - `AZURE_TENANT_ID`: tenant de Azure Entra ID
+  - `AZURE_CLIENT_ID`: client ID de la app registrada en Azure
+  - `FRONTEND_URL`: URL del frontend (para magic links)
+  - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`: email para magic link
 - **Health check**: `GET /api/health`, puerto 3001
 
-### S3 + CloudFront — Frontend
+### ECS Fargate — Frontend Web
 
-- **Build**: `npm run build` en el Dockerfile frontend, output estático a S3.
-- **Bucket**: `bpm-frontend-prod` con static website hosting.
-- **CloudFront**: distribución con origen S3.
-  - Comportamiento `/api/*`: redirige al ALB (origen adicional).
-  - Comportamiento `/*`: sirve desde S3.
-- **Cache**: archivos estáticos (JS, CSS, imágenes) con TTL 1 año (inmutable por hash de build). HTML con TTL 0.
+- **Servicio**: `bpm-web`
+- **Task definition**: 1 vCPU, 2 GB RAM
+- **Imagen**: construida desde `frontend/Dockerfile` (multi-stage, Node.js 24 Alpine), publicada en ECR
+- **Puerto**: 3000
+- **Auto-scaling**: min 1, max 2 tareas.
+- **Variables de entorno** (build-time):
+  - `NEXT_PUBLIC_API_URL`: URL pública de la API (ej: `https://bpm.empresa.com/api`)
+  - `NEXT_PUBLIC_MOCK_AUTH`: `false` en producción
+  - `API_INTERNAL_URL`: URL interna del backend (`http://bpm-api:3001`)
+- **Rewrite**: Next.js proxyea `/api/*` → `API_INTERNAL_URL/api/*` internamente.
+- **Health check**: `GET /`, puerto 3000
+
+### S3 + CloudFront — Frontend (Next.js)
+
+- **Build**: `npm run build` con el Dockerfile del frontend (multi-stage, Node.js 24).
+- **Runtime**: Next.js requiere servidor Node.js para SSR y API rewrites. Ejecutar en ECS Fargate (mismo cluster que el backend) o usar AWS Amplify Hosting para Next.js.
+- **Alternativa ECS**: la imagen Docker del frontend corre `npm start` en puerto 3000, con rewrites de `/api/*` al backend via `API_INTERNAL_URL`.
+- **Alternativa Amplify**: build automático desde el repositorio, soporte nativo para Next.js SSR.
+- **CloudFront**: distribución con origen en el ECS/Amplify del frontend.
+  - Comportamiento `/*`: sirve desde el frontend (incluye SSR y `/api/*` proxy).
+  - Alternativa con dominio separado: `api.bpm.empresa.com` → ALB → backend ECS.
+- **Cache**: archivos estáticos (`/_next/static/*`) con TTL 1 año. Rutas dinámicas con TTL 0.
 - **WAF**: asociado a CloudFront para protección contra OWASP Top 10 y rate limiting.
 
 ### RDS PostgreSQL
@@ -67,7 +90,9 @@ Propuesta de despliegue en AWS para entorno productivo.
 ### Secrets Manager
 
 - Secreto `bpm/prod/database`: `DATABASE_URL` completo.
-- Secreto `bpm/prod/jwt`: `JWT_SECRET`.
+- Secreto `bpm/prod/jwt-external`: `JWT_SECRET_EXTERNAL`.
+- Secreto `bpm/prod/jwt-internal`: `JWT_SECRET_INTERNAL`.
+- Secreto `bpm/prod/smtp`: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`.
 - Rotación automática de RDS password (opcional, cada 30 días).
 
 ### ALB (Application Load Balancer)
@@ -96,6 +121,8 @@ Propuesta de despliegue en AWS para entorno productivo.
 
 ### Pipeline CI/CD (GitHub Actions)
 
+El proyecto ya tiene `.github/workflows/ci.yml` con lint, tests unitarios, e2e y build. Para deploy en AWS se agrega un workflow adicional `.github/workflows/deploy.yml`:
+
 ```yaml
 # .github/workflows/deploy.yml
 name: Deploy
@@ -123,16 +150,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build
-        run: npm run build
-        working-directory: frontend
-      - name: Deploy to S3
+      - name: Build and push Docker image
         run: |
-          aws s3 sync .next/static s3://bpm-frontend-prod/_next/static --cache-control "max-age=31536000, immutable"
-          aws s3 sync public s3://bpm-frontend-prod/
-      - name: Invalidate CloudFront
+          docker build -t $ECR_FRONTEND_REPO:latest -f frontend/Dockerfile \
+            --build-arg NEXT_PUBLIC_API_URL=https://bpm.empresa.com/api \
+            --build-arg NEXT_PUBLIC_MOCK_AUTH=false \
+            --build-arg API_INTERNAL_URL=http://localhost:3001 .
+          docker push $ECR_FRONTEND_REPO:latest
+      - name: Deploy to ECS
         run: |
-          aws cloudfront create-invalidation --distribution-id $CF_DIST_ID --paths "/*"
+          aws ecs update-service --cluster bpm-cluster --service bpm-web --force-new-deployment
 ```
 
 ### Estrategia de migración
@@ -148,15 +175,22 @@ jobs:
 ### Rollback de aplicación
 
 ```bash
-# Desde la consola de AWS o CLI:
+# Rollback del backend
 aws ecs update-service \
   --cluster bpm-cluster \
   --service bpm-api \
   --task-definition bpm-api:previous-revision \
   --force-new-deployment
+
+# Rollback del frontend
+aws ecs update-service \
+  --cluster bpm-cluster \
+  --service bpm-web \
+  --task-definition bpm-web:previous-revision \
+  --force-new-deployment
 ```
 
-### Rollback de frontend
+### Rollback de frontend (alternativa S3/Amplify)
 
 ```bash
 # Restaurar versión anterior desde S3 (si se mantienen versiones)
@@ -179,10 +213,18 @@ aws cloudfront create-invalidation --distribution-id $CF_DIST_ID --paths "/*"
 
 ```env
 DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@${RDS_HOST}:5432/bpm_db
-JWT_SECRET=${JWT_SECRET}
+JWT_SECRET_EXTERNAL=${JWT_SECRET_EXTERNAL}
+JWT_SECRET_INTERNAL=${JWT_SECRET_INTERNAL}
 MOCK_AUTH=false
+AZURE_TENANT_ID=${AZURE_TENANT_ID}
+AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
+FRONTEND_URL=https://bpm.empresa.com
+SMTP_HOST=${SMTP_HOST}
+SMTP_PORT=${SMTP_PORT}
+SMTP_USER=${SMTP_USER}
+SMTP_PASS=${SMTP_PASS}
+SMTP_FROM=no-reply@bpm.empresa.com
 NODE_ENV=production
-PORT=3001
 ```
 
 (Todas las credenciales se obtienen de Secrets Manager en tiempo de ejecución.)
@@ -197,17 +239,16 @@ PORT=3001
 
 ## 5. Costos estimados (mensual, USD)
 
-| Servicio           | Configuración                  | Costo aprox.  |
-| ------------------ | ------------------------------ | ------------- |
-| ECS Fargate        | 1 tarea × 1 vCPU, 2 GB         | ~$35          |
-| RDS PostgreSQL     | db.t3.medium, 100 GB, Multi-AZ | ~$120         |
-| ALB                | 1 LB + tráfico                 | ~$25          |
-| S3                 | 10 GB + requests               | ~$5           |
-| CloudFront         | 50 GB transferencia            | ~$5           |
-| CloudWatch         | Logs + métricas                | ~$15          |
-| Secrets Manager    | 2 secretos                     | ~$1           |
-| WAF                | 1 WebACL                       | ~$8           |
-| **Total estimado** |                                | **~$214/mes** |
+| Servicio           | Configuración                       | Costo aprox.  |
+| ------------------ | ----------------------------------- | ------------- |
+| ECS Fargate        | 2 tareas × 1 vCPU, 2 GB (api + web) | ~$70          |
+| RDS PostgreSQL     | db.t3.medium, 100 GB, Multi-AZ      | ~$120         |
+| ALB                | 1 LB + tráfico                      | ~$25          |
+| CloudFront         | 50 GB transferencia                 | ~$5           |
+| CloudWatch         | Logs + métricas                     | ~$15          |
+| Secrets Manager    | 3 secretos                          | ~$1.50        |
+| WAF                | 1 WebACL                            | ~$8           |
+| **Total estimado** |                                     | **~$245/mes** |
 
 > Nota: costos estimados a junio 2026. Ajustar según región (us-east-1 como referencia). Para entornos de desarrollo, reducir a single-AZ, instancias más pequeñas, y desactivar WAF.
 
@@ -237,4 +278,4 @@ PORT=3001
 
 ---
 
-_Última actualización: 2026-06-16_
+_Última actualización: 2026-06-18_
