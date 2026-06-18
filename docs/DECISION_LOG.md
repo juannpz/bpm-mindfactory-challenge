@@ -65,7 +65,7 @@ El aggregate `Tramite` contiene:
 | Documentos    | `DocumentoUseCases`     | Subir archivos al storage, listar con filtro por visibilidad, obtener metadatos y eliminar documentos.                                                                                                                                                   |
 | Dashboard     | `DashboardUseCases`     | Calcular métricas agregadas: trámites por estado, por origen, vencidos por SLA, promedio de resolución, cantidad por área, últimos movimientos.                                                                                                          |
 | Configuración | `ConfiguracionUseCases` | CRUD de tipos de trámite y áreas administrativas.                                                                                                                                                                                                        |
-| Auth          | `AuthUseCases`          | Registro de usuario externo (bcrypt), login externo (JWT HS256), login interno mock (RS256 OIDC), y obtención del perfil actual (`/auth/me`).                                                                                                            |
+| Auth          | `AuthUseCases`          | Registro de usuario externo (bcrypt), login externo (JWT HS256), login interno mock (RS256 OIDC), login vía magic link (token single-use + email), y obtención del perfil actual (`/auth/me`).                                                           |
 
 **Por qué**: cada grupo representa un bounded context dentro del dominio de trámites. Separarlos evita que un caso de uso acumule demasiadas responsabilidades y facilita el testing unitario — cada caso de uso solo depende de los puertos que necesita.
 
@@ -122,15 +122,15 @@ presentation/    → controllers, guards, pipes, exception filters
 
 ### 6.1. Separación total de sesiones
 
-**Decisión**: internos y externos usan estrategias de autenticación completamente separadas. Internos vía mock OIDC con header `X-Mock-User-Id` (preparado para Azure Entra ID), externos vía JWT con `passport-jwt` + bcrypt.
+**Decisión**: internos y externos usan estrategias de autenticación completamente separadas. Internos vía JWT RS256 firmado por OIDC mock local (modo dev) o Azure Entra ID (modo prod), externos vía JWT HS256 con `passport-jwt` + bcrypt. Ambos tokens viajan en header `Authorization: Bearer` y el guard distingue el tipo validando contra el secret correspondiente.
 
 **Por qué**: distinguir ambos tipos de identidad es requisito explícito del dominio. Separar las estrategias evita que un token externo sea aceptado en un endpoint interno (y viceversa).
 
-### 6.2. Mock auth configurable
+### 6.2. Mock auth configurable con OIDC emulado
 
-**Decisión**: `MOCK_AUTH=true` activa el header `X-Mock-User-Id` para desarrollo local. Cuando es `false`, se espera un token real de Azure Entra ID.
+**Decisión**: `MOCK_AUTH=true` (default) activa el OIDC mock local: `POST /auth/internal/login` recibe `{ azureObjectId }`, busca el usuario en BD, firma un JWT RS256 con `MockInternalTokenSigner` y lo retorna. Los guards validan este token con `MockInternalTokenValidator`. Cuando `MOCK_AUTH=false`, la validación se delega a `AzureInternalTokenValidator` que verifica contra los JWKS de Azure Entra ID.
 
-**Por qué**: permite desarrollar sin depender de Azure. El mock está documentado y preparado para ser reemplazado por el provider real.
+**Por qué**: permite desarrollar sin depender de Azure. El mock usa el mismo flujo (JWT Bearer) que producción, solo cambia quién firma y valida el token. El frontend es idéntico en ambos modos.
 
 ### 6.3. OIDC mock con JWKS
 
@@ -230,13 +230,11 @@ presentation/    → controllers, guards, pipes, exception filters
 
 ## 11. Capa de presentación
 
-### 11.1. Auth guard combinado
+### 11.1. Auth guard provider-agnostic
 
-**Decisión**: un único `AuthGuard` que primero intenta validar un JWT Bearer token (usuario externo) y, si no hay, busca el header `X-Mock-User-Id` (usuario interno). Para internos, resuelve rol y areaId desde el repositorio.
+**Decisión**: el `AuthGuard` valida el token Bearer contra tres fuentes en orden: validador mock (RS256 local, solo si `MOCK_AUTH=true`), validador Azure (JWKS, solo si `MOCK_AUTH=false`), y JWT externo (HS256). Si ninguna es válida, intenta el fallback `X-Mock-User-Id` (solo en modo mock). Tras la validación, resuelve el usuario contra el repositorio correspondiente y setea `request.user` con id, tipo, rol y área.
 
-**Por qué**: simplifica la protección de endpoints que aceptan ambos tipos de usuario (ej. trámites, comentarios). Evita tener que anidar guards con lógica OR. Los endpoints que requieren un tipo específico (ej. `/auth/internal/me`) validan el tipo en el controller.
-
-**Trade-off**: el guard hace una query extra a la DB para resolver el usuario interno en cada request. Como los volúmenes esperados son bajos, el impacto es mínimo.
+**Por qué**: un solo guard para endpoints que aceptan ambos tipos de usuario (trámites, comentarios, documentos). Evita anidar guards con lógica OR. El `InternalAuthGuard` usa la misma lógica pero omite la validación de JWT externo. La arquitectura permite cambiar de mock a Azure sin tocar controllers.
 
 ### 11.2. `@Public()` decorator
 
@@ -299,6 +297,22 @@ presentation/    → controllers, guards, pipes, exception filters
 **Decisión**: el endpoint siempre retorna el mismo mensaje — "Si el email está registrado, recibirás un enlace de acceso" — independientemente de si el email existe o no.
 
 **Por qué**: previene enumeración de usuarios (user enumeration attack). Un atacante no puede determinar qué emails están registrados en el sistema.
+
+---
+
+## 14. CI/CD y Deploy
+
+### 14.1. GitHub Actions con jobs paralelos
+
+**Decisión**: workflow `.github/workflows/ci.yml` con 5 jobs independientes: lint, test-unit, test-e2e, build y commitlint. Solo build depende de lint + tests. Node 24 (misma versión que Dockerfiles). Cache npm por lockfile de cada paquete.
+
+**Por qué**: feedback rápido — lint, unit tests y e2e corren en paralelo. Build solo se ejecuta si lo anterior pasa, ahorrando minutos. Commitlint valida Conventional Commits en PRs.
+
+### 14.2. Deploy con Coolify + Docker Compose
+
+**Decisión**: `docker-compose.coolify.yml` optimizado para Coolify v4. Sin `env_file` (Coolify inyecta variables), sin puertos expuestos en db/api (comunicación interna vía compose network), solo expone frontend en `WEB_PORT`. Next.js rewrites proxean `/api/*` al backend internamente, evitando exponer la API.
+
+**Trade-off**: los archivos subidos y la base de datos dependen de volúmenes Docker. Si el VPS se pierde sin backups, los datos se pierden. Para producción real, configurar backups automáticos del volumen `pgdata`.
 
 ---
 
