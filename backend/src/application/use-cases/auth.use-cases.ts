@@ -4,7 +4,7 @@ import { UsuarioExterno } from '@domain/entities';
 import { EstadoUsuarioExterno } from '@domain/enums';
 import { v4 as uuid } from 'uuid';
 import * as bcrypt from 'bcrypt';
-import { RegistroExternoDto, LoginExternoDto } from '../dtos';
+import { RegistroExternoDto, LoginExternoDto, InternalLoginDto } from '../dtos';
 import type { AuthResponse } from '../dtos/responses';
 import {
   USUARIO_EXTERNO_REPOSITORY,
@@ -14,10 +14,6 @@ import type { IUsuarioExternoRepository } from '../ports/usuario-externo.reposit
 import type { IUsuarioInternoRepository } from '../ports/usuario-interno.repository.port';
 import type { IInternalTokenSigner } from '../ports/auth.provider.port';
 import { INTERNAL_TOKEN_SIGNER } from '../ports/auth.provider.port';
-
-export interface InternalLoginDto {
-  azureObjectId: string;
-}
 
 @Injectable()
 export class AuthUseCases {
@@ -48,19 +44,7 @@ export class AuthUseCases {
     const usuario = await this.usuarioExternoRepo.create(
       usuarioExterno as UsuarioExterno & { passwordHash: string },
     );
-    const token = this.jwtService.sign({
-      sub: usuario.id,
-      email: usuario.email,
-    });
-    return {
-      token,
-      usuario: {
-        id: usuario.id,
-        nombre: usuario.nombre,
-        email: usuario.email,
-        tipo: 'EXTERNO',
-      },
-    };
+    return this.buildExternoAuthResponse(usuario);
   }
 
   async loginExterno(dto: LoginExternoDto): Promise<AuthResponse> {
@@ -70,6 +54,27 @@ export class AuthUseCases {
     if (!usuario.passwordHash) throw new Error('Credenciales inválidas');
     const ok = await bcrypt.compare(dto.password, usuario.passwordHash);
     if (!ok) throw new Error('Credenciales inválidas');
+    return this.buildExternoAuthResponse(usuario);
+  }
+
+  async buscarExternoPorEmail(email: string): Promise<{
+    id: string;
+    nombre: string;
+    email: string;
+  } | null> {
+    const usuario = await this.usuarioExternoRepo.findByEmail(email);
+    if (!usuario || !usuario.estaActivo()) return null;
+    return { id: usuario.id, nombre: usuario.nombre, email: usuario.email };
+  }
+
+  async loginExternoPorEmail(email: string): Promise<AuthResponse> {
+    const usuario = await this.usuarioExternoRepo.findByEmail(email);
+    if (!usuario || !usuario.estaActivo())
+      throw new Error('Credenciales inválidas');
+    return this.buildExternoAuthResponse(usuario);
+  }
+
+  private buildExternoAuthResponse(usuario: UsuarioExterno): AuthResponse {
     const token = this.jwtService.sign({
       sub: usuario.id,
       email: usuario.email,

@@ -5,4 +5,3 @@ export { DocumentoUseCases } from './documento.use-cases';
 export { DashboardUseCases } from './dashboard.use-cases';
 export { ConfiguracionUseCases } from './configuracion.use-cases';
 export { AuthUseCases } from './auth.use-cases';
-export type { InternalLoginDto } from './auth.use-cases';
