@@ -65,7 +65,9 @@ cd frontend && npm test
 
 ## Credenciales Seed
 
-### Usuarios Internos (Mock Auth via header `X-Mock-User-Id`)
+### Usuarios Internos (Mock Auth — seleccionar del dropdown, sin contraseña)
+
+En `/interno/login` se muestra un dropdown con los 5 usuarios. Seleccionar uno y hacer clic en **Ingresar**.
 
 | Nombre                    | Rol          | Área            | Azure Object ID  |
 | ------------------------- | ------------ | --------------- | ---------------- |
@@ -75,13 +77,17 @@ cd frontend && npm test
 | Operador Legal            | OPERADOR     | Legales         | `mock-legal-001` |
 | Auditor                   | AUDITOR      | Administración  | `mock-audit-001` |
 
-### Usuarios Externos
+### Usuarios Externos (login con email + contraseña, o magic link)
+
+En `/externo/login` ingresar email y contraseña, o usar **Ingresar con enlace mágico**.
 
 | Nombre       | Email               | Password       | Estado                 |
 | ------------ | ------------------- | -------------- | ---------------------- |
 | Juan Pérez   | `externo1@test.com` | `Password123!` | ACTIVO                 |
 | María García | `externo2@test.com` | `Password123!` | ACTIVO                 |
 | Carlos López | `externo3@test.com` | `Password123!` | PENDIENTE_VERIFICACION |
+
+> `externo3@test.com` no puede iniciar sesión ni usar magic link — su estado es `PENDIENTE_VERIFICACION`.
 
 ### Autenticación Azure Entra ID (producción)
 
@@ -108,7 +114,13 @@ Los usuarios externos pueden iniciar sesión sin contraseña mediante magic link
 - `POST /api/auth/external/magic-link/request` — Solicitar enlace (recibe `{ email }`)
 - `POST /api/auth/external/magic-link/verify` — Verificar token e iniciar sesión
 
-**Modo desarrollo (sin SMTP):** el enlace mágico se devuelve en la respuesta del endpoint y se muestra en el frontend para testing.
+**Cómo probarlo localmente (sin SMTP):**
+
+1. Ir a `http://localhost:3000/externo/login`
+2. Click en **"Ingresar con enlace mágico"**
+3. Ingresar `externo1@test.com` y enviar
+4. El enlace se muestra en pantalla (modo desarrollo)
+5. Click en **"Iniciar sesión"** — verifica el token y redirige a Mis Trámites
 
 **Modo producción con email real:** configurar SMTP en `.env`:
 
