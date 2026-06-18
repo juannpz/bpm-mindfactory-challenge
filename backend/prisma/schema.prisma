@@ -1,0 +1,152 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Area {
+  id     String @id @default(uuid())
+  nombre String
+  codigo String @unique
+  activa Boolean @default(true)
+
+  tiposTramite    TipoTramite[]
+  tramites        Tramite[]      @relation("AreaActual")
+  usuariosInternos UsuarioInterno[]
+}
+
+model UsuarioInterno {
+  id            String  @id @default(uuid())
+  nombre        String
+  email         String  @unique
+  areaId        String?
+  rol           String
+  azureObjectId String  @unique
+  activo        Boolean @default(true)
+
+  area Area? @relation(fields: [areaId], references: [id])
+
+  tramitesAsignados Tramite[] @relation("UsuarioAsignado")
+  tramitesCreados   Tramite[] @relation("UsuarioInternoCreador")
+}
+
+model UsuarioExterno {
+  id           String   @id @default(uuid())
+  nombre       String
+  email        String   @unique
+  passwordHash String
+  documento    String
+  organizacion String
+  estado       String   @default("PENDIENTE_VERIFICACION")
+  fechaAlta    DateTime @default(now())
+
+  tramites        Tramite[] @relation("UsuarioExternoAsignado")
+  tramitesCreados Tramite[] @relation("UsuarioExternoCreador")
+}
+
+model TipoTramite {
+  id                   String  @id @default(uuid())
+  codigo               String  @unique
+  nombre               String
+  descripcion          String
+  activo               Boolean @default(true)
+  requiereExterno      Boolean @default(false)
+  permiteInicioExterno Boolean @default(false)
+  slaHoras             Int
+  areaInicialId        String?
+
+  areaInicial Area?     @relation(fields: [areaInicialId], references: [id])
+  tramites    Tramite[]
+}
+
+model Tramite {
+  id                   String    @id @default(uuid())
+  numero               String    @unique
+  tipoTramiteId        String?
+  titulo               String
+  descripcion          String    @default("")
+  origen               String
+  estado               String    @default("BORRADOR")
+  prioridad            String    @default("MEDIA")
+  areaActualId         String?
+  usuarioAsignadoId    String?
+  usuarioExternoId     String?
+  creadoPorTipo        String
+  creadoPorInternoId   String?
+  creadoPorExternoId   String?
+  fechaCreacion        DateTime  @default(now())
+  fechaActualizacion   DateTime  @default(now())
+  fechaCierre          DateTime?
+  version              Int       @default(1)
+
+  tipoTramite     TipoTramite?     @relation(fields: [tipoTramiteId], references: [id])
+  areaActual      Area?            @relation("AreaActual", fields: [areaActualId], references: [id])
+  usuarioAsignado UsuarioInterno?  @relation("UsuarioAsignado", fields: [usuarioAsignadoId], references: [id])
+  usuarioExterno  UsuarioExterno?  @relation("UsuarioExternoAsignado", fields: [usuarioExternoId], references: [id])
+  creadoPorInterno UsuarioInterno? @relation("UsuarioInternoCreador", fields: [creadoPorInternoId], references: [id])
+  creadoPorExterno UsuarioExterno? @relation("UsuarioExternoCreador", fields: [creadoPorExternoId], references: [id])
+
+  movimientos MovimientoTramite[]
+  documentos  DocumentoTramite[]
+  comentarios ComentarioTramite[]
+
+  @@index([estado])
+  @@index([origen])
+  @@index([areaActualId])
+  @@index([usuarioAsignadoId])
+  @@index([usuarioExternoId])
+  @@index([fechaCreacion])
+}
+
+model MovimientoTramite {
+  id             String   @id @default(uuid())
+  tramiteId      String?
+  estadoAnterior String?
+  estadoNuevo    String
+  areaAnteriorId String?
+  areaNuevaId    String?
+  usuarioTipo    String
+  usuarioId      String?
+  accion         String
+  comentario     String?
+  fecha          DateTime @default(now())
+
+  tramite Tramite? @relation(fields: [tramiteId], references: [id])
+
+  @@index([tramiteId])
+  @@index([fecha])
+}
+
+model DocumentoTramite {
+  id            String   @id @default(uuid())
+  tramiteId     String?
+  nombreArchivo String
+  mimeType      String
+  size          Int
+  storageKey    String
+  subidoPorTipo String
+  subidoPorId   String?
+  fechaCarga    DateTime @default(now())
+
+  tramite Tramite? @relation(fields: [tramiteId], references: [id])
+
+  @@index([tramiteId])
+}
+
+model ComentarioTramite {
+  id          String   @id @default(uuid())
+  tramiteId   String?
+  mensaje     String
+  visibilidad String   @default("TODOS")
+  autorTipo   String
+  autorId     String?
+  fecha       DateTime @default(now())
+
+  tramite Tramite? @relation(fields: [tramiteId], references: [id])
+
+  @@index([tramiteId])
+  @@index([visibilidad])
+}

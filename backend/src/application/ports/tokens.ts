@@ -1,0 +1,10 @@
+export const TRAMITE_REPOSITORY = Symbol('ITramiteRepository');
+export const MOVIMIENTO_REPOSITORY = Symbol('IMovimientoRepository');
+export const DOCUMENTO_REPOSITORY = Symbol('IDocumentoRepository');
+export const COMENTARIO_REPOSITORY = Symbol('IComentarioRepository');
+export const TIPO_TRAMITE_REPOSITORY = Symbol('ITipoTramiteRepository');
+export const AREA_REPOSITORY = Symbol('IAreaRepository');
+export const USUARIO_INTERNO_REPOSITORY = Symbol('IUsuarioInternoRepository');
+export const USUARIO_EXTERNO_REPOSITORY = Symbol('IUsuarioExternoRepository');
+export const FILE_STORAGE = Symbol('IFileStorage');
+export { UNIT_OF_WORK } from './unit-of-work.port';
