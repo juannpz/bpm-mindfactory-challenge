@@ -1,0 +1,10 @@
+node_modules
+dist
+build
+.next
+coverage
+CHALLENGE.md
+PLAN.md
+NOTES.md
+.kilo
+local
