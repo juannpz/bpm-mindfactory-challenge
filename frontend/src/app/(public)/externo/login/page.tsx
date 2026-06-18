@@ -109,6 +109,15 @@ export default function ExternoLoginPage() {
 
       <Box sx={{ textAlign: "center", mt: 2 }}>
         <Typography variant="body2" color="text.secondary" gutterBottom>
+          ¿Sin contraseña?
+        </Typography>
+        <Button variant="text" onClick={() => router.push("/externo/magic-link")}>
+          Ingresar con enlace mágico
+        </Button>
+      </Box>
+
+      <Box sx={{ textAlign: "center", mt: 2 }}>
+        <Typography variant="body2" color="text.secondary" gutterBottom>
           ¿No tiene cuenta?
         </Typography>
         <Button variant="text" onClick={() => router.push("/externo/registro")}>

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import * as jwt from 'jsonwebtoken';
+import jwksRsa from 'jwks-rsa';
 import { OidcService } from './oidc.service';
 
 export interface InternalTokenPayload {
@@ -11,9 +12,6 @@ export interface InternalTokenPayload {
   azureObjectId: string;
 }
 
-/**
- * Valida tokens internos generados por el OIDC mock local (RS256).
- */
 @Injectable()
 export class MockInternalTokenValidator {
   constructor(private readonly oidcService: OidcService) {}
@@ -41,23 +39,69 @@ export class MockInternalTokenValidator {
   }
 }
 
-/**
- * Valida tokens de Azure Entra ID usando passport-azure-ad BearerStrategy.
- *
- * Requiere AZURE_TENANT_ID y AZURE_CLIENT_ID configurados.
- * Para producción, valida issuer, audiencia, firma y expiración contra Azure JWKS.
- */
 @Injectable()
 export class AzureInternalTokenValidator {
-  verify(_token: string): InternalTokenPayload | null {
-    // En producción, passport-azure-ad valida automáticamente contra Azure JWKS.
-    // Por ahora, esta implementación es un placeholder — el sistema está arquitectónicamente
-    // preparado con los endpoints OIDC y guards agnósticos al proveedor.
-    //
-    // Para activar producción real:
-    // 1. Configurar AZURE_TENANT_ID y AZURE_CLIENT_ID
-    // 2. Implementar BearerStrategy de passport-azure-ad
-    // 3. Validar token.oid contra UsuarioInterno.azureObjectId
-    return null;
+  private readonly client: jwksRsa.JwksClient | null;
+  private readonly tenantId: string;
+  private readonly clientId: string;
+  private readonly issuer: string;
+
+  constructor() {
+    this.tenantId = process.env.AZURE_TENANT_ID ?? '';
+    this.clientId = process.env.AZURE_CLIENT_ID ?? '';
+    this.issuer = this.tenantId
+      ? `https://login.microsoftonline.com/${this.tenantId}/v2.0`
+      : '';
+
+    if (this.tenantId && this.clientId) {
+      this.client = jwksRsa({
+        jwksUri: `https://login.microsoftonline.com/${this.tenantId}/discovery/v2.0/keys`,
+        cache: true,
+        rateLimit: true,
+        jwksRequestsPerMinute: 10,
+        cacheMaxEntries: 5,
+        cacheMaxAge: 600_000,
+      });
+    } else {
+      this.client = null;
+    }
+  }
+
+  async verify(token: string): Promise<InternalTokenPayload | null> {
+    if (!this.client) return null;
+
+    return new Promise((resolve) => {
+      jwt.verify(
+        token,
+        (header, callback) => {
+          this.client!.getSigningKey(header.kid ?? '', (err, key) => {
+            if (err || !key) return callback(err ?? new Error('Key not found'));
+            callback(null, key.getPublicKey());
+          });
+        },
+        {
+          algorithms: ['RS256', 'RS384'],
+          issuer: this.issuer,
+          audience: this.clientId,
+          clockTolerance: 60,
+        },
+        (err, decoded: any) => {
+          if (err) return resolve(null);
+
+          const oid = decoded?.oid;
+          if (!oid) return resolve(null);
+
+          resolve({
+            sub: oid,
+            email:
+              decoded.email ?? decoded.preferred_username ?? decoded.upn ?? '',
+            name: decoded.name ?? '',
+            rol: '',
+            areaId: null,
+            azureObjectId: oid,
+          });
+        },
+      );
+    });
   }
 }
