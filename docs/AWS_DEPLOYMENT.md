@@ -259,7 +259,7 @@ NODE_ENV=production
 - **Dominio**: `bpm.empresa.com` (ejemplo)
 - **Route 53**: hosted zone con:
   - `A` record → CloudFront distribution (frontend)
-  - `api.bpm.empresa.com` → ALB (backend, opcional si unificas con CloudFront)
+  - `api.bpm.empresa.com` → ALB (backend, opcional si se unifica con CloudFront)
 - **Certificado SSL**: ACM en us-east-1 (requerido por CloudFront).
 
 ---
