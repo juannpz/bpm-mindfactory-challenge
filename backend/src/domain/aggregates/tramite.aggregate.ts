@@ -265,7 +265,7 @@ export class Tramite {
       TipoUsuario.INTERNO,
       operadorId,
       this.areaActualId,
-      undefined,
+      null,
       comentario,
     );
   }
