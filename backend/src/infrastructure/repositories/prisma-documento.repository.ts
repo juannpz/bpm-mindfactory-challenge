@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { IDocumentoRepository } from '@application/ports/documento.repository.port';
 import { DocumentoTramite } from '@domain/entities';
-import type { DocumentoTramiteProps } from '@domain/entities/documento-tramite.entity';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()

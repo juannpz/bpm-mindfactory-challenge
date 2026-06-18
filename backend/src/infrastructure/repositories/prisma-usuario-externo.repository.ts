@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { IUsuarioExternoRepository } from '@application/ports/usuario-externo.repository.port';
 import { UsuarioExterno } from '@domain/entities';
-import type { UsuarioExternoProps } from '@domain/entities/usuario-externo.entity';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()

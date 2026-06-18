@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { ITipoTramiteRepository } from '@application/ports/tipo-tramite.repository.port';
 import { TipoTramite } from '@domain/entities';
-import type { TipoTramiteProps } from '@domain/entities/tipo-tramite.entity';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()

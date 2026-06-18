@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { IMovimientoRepository } from '@application/ports/movimiento.repository.port';
 import { MovimientoTramite } from '@domain/entities';
-import type { MovimientoTramiteProps } from '@domain/entities/movimiento-tramite.entity';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()

@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { IComentarioRepository } from '@application/ports/comentario.repository.port';
 import { ComentarioTramite } from '@domain/entities';
-import type { ComentarioTramiteProps } from '@domain/entities/comentario-tramite.entity';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
