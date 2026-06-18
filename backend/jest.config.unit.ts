@@ -7,7 +7,7 @@ const config: Config.InitialOptions = {
   transform: {
     '^.+\\.(t|j)s$': 'ts-jest',
   },
-  transformIgnorePatterns: ['/node_modules/(?!(uuid)/)'],
+  transformIgnorePatterns: ['/node_modules/(?!(uuid|jose|jwks-rsa)/)'],
   collectCoverageFrom: ['src/**/*.(t|j)s', '!src/generated/**'],
   coverageDirectory: './coverage',
   testEnvironment: 'node',
