@@ -199,7 +199,7 @@ function MagicLinkVerify({ token }: { token: string }) {
         <Alert severity="error" sx={{ mb: 3 }}>
           {error}
         </Alert>
-        <Button variant="contained" onClick={() => router.push("/externo/magic-link")}>
+        <Button variant="contained" onClick={() => router.push("/magic-link")}>
           Solicitar nuevo enlace
         </Button>
       </Box>

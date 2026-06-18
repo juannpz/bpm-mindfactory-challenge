@@ -88,7 +88,7 @@ export class AuthController {
 
     const token = this.magicTokenService.generate(dto.email);
     const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
-    const magicLink = `${frontendUrl}/externo/magic-link?token=${encodeURIComponent(token)}`;
+    const magicLink = `${frontendUrl}/magic-link?token=${encodeURIComponent(token)}`;
 
     const { sent } = await this.emailService.sendMagicLink(
       dto.email,
