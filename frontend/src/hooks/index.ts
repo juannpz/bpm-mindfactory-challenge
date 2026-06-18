@@ -1,0 +1,10 @@
+export { useTramites } from "./useTramites";
+export { useTramite } from "./useTramite";
+export { useDashboard } from "./useDashboard";
+export { useMovimientos } from "./useMovimientos";
+export { useComentarios } from "./useComentarios";
+export { useDocumentos } from "./useDocumentos";
+export { useTiposTramite } from "./useTiposTramite";
+export { useAreas } from "./useAreas";
+export { useWorkflowAction } from "./useWorkflowAction";
+export type { WorkflowAction } from "./useWorkflowAction";
