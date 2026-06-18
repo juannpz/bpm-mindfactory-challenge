@@ -27,5 +27,11 @@
       "@presentation/*": ["./src/presentation/*"]
     }
   },
-  "include": ["src/**/*.ts", "test/**/*.ts", "jest.config.unit.ts"]
+  "include": [
+    "src/**/*.ts",
+    "test/**/*.ts",
+    "jest.config.unit.ts",
+    "prisma.config.ts",
+    "prisma/seeds/seed.ts"
+  ]
 }
